@@ -1,0 +1,55 @@
+os: linux
+dist: focal
+
+language: python
+rvm: 3.2.2
+
+git:
+  depth: 10
+
+cache:
+  bundler: true
+  timeout: 600
+
+stages:
+  - name: prepare cache
+
+  - name: test
+
+  - name: ":ship: it to quay.io"
+    if: commit_message =~ /ship:docker/ OR env(SHIP_DOCKER) = true
+
+before_install:
+  - gem install rubygems-update -v 3.4.22
+  - gem update --silent --system 3.4.13
+  - 'echo "gem: --no-document" >> ~/.gemrc' # Skip installing documentation
+  # - gem install bundler -v $(awk '/BUNDLED WITH/{getline; print}' Gemfile.lock)
+
+jobs:
+  include:
+    - stage: prepare cache
+      script: true
+
+    - stage: test
+      name: rspec
+      script:
+        - bundle exec rspec
+
+    - stage: test
+      name: integration_configs
+      script:
+        - bundle exec rspec spec/integrate/configs_spec.rb --tag integration_configs
+
+    - stage: test
+      name: integration_matrix
+      script:
+        - bundle exec rspec spec/integrate/matrix_spec.rb --tag integration_matrix
+
+    - stage: ":ship: it to quay.io"
+      dist: jammy
+      language: minimal
+      cache:
+        bundler: false
+      before_install: skip
+      install: skip
+      script: make ship
